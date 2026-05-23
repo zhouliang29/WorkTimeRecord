@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "WorkTime-打卡时间记录",
+  "version": "0.1.0",
+  "description": "记录每日打卡时间，方便查看和管理工作时间。",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://timor.tech/api/holiday/*"
+  ],
+  "action": {
+    "default_popup": "work-time-record.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

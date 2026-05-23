@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyTime | 工时记录日历</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+
+    body {
+      width: 800px;
+      min-width: 800px;
+      max-width: 800px;
+      padding: 12px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
+      color: #333;
+      font-size: 14px;
+    }
+
+    #calendarGrid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 1px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .calendar-cell {
+      padding: 3px 2px;
+      border-radius: 6px;
+      font-size: 12px;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      min-height: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .day-header {
+      font-weight: 600;
+      color: #4A90E2;
+      background: rgba(74, 144, 226, 0.08);
+      padding: 6px 3px;
+      font-size: 11px;
+      aspect-ratio: auto;
+      min-height: 24px;
+    }
+
+    .week-total {
+      font-weight: 700;
+      background: rgba(94, 96, 206, 0.1);
+      color: #5E60CE;
+      padding: 6px 3px;
+      font-size: 11px;
+    }
+
+
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .app-title {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #4A90E2, #5E60CE);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .app-title::before {
+      content: "⏱";
+      font-size: 22px;
+    }
+
+    /* 星星弹出动画 */
+    .star {
+      position: absolute;
+      font-size: 16px;
+      color: #FFD700;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .star.animate {
+      animation: starPop 1.2s ease-out forwards;
+    }
+
+    @keyframes starPop {
+      0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(0.5) rotate(0deg);
+      }
+      30% {
+        opacity: 1;
+        transform: translate(var(--dx), var(--dy)) scale(1.2) rotate(180deg);
+      }
+      70% {
+        opacity: 0.8;
+        transform: translate(calc(var(--dx) * 1.5), calc(var(--dy) * 1.5)) scale(1) rotate(360deg);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(calc(var(--dx) * 2), calc(var(--dy) * 2)) scale(0.3) rotate(540deg);
+      }
+    }
+
+    /* 成功提示动画 */
+    .success-ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 215, 0, 0.3);
+      pointer-events: none;
+      animation: ripple 0.8s ease-out;
+    }
+
+    @keyframes ripple {
+      0% {
+        width: 0;
+        height: 0;
+        opacity: 1;
+      }
+      100% {
+        width: 100px;
+        height: 100px;
+        opacity: 0;
+      }
+    }
+
+
+    .calendar-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      padding: 10px;
+      overflow: auto;
+      width: 100%;
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .nav-button {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: none;
+      background: #f0f4f8;
+      color: #4A90E2;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .nav-button:hover {
+      background: #4A90E2;
+      color: white;
+      transform: scale(1.05);
+    }
+
+    .month-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+
+    #monthYear {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    /* 统一的日历网格样式 */
+    #calendarGrid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 1px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .calendar-cell {
+      padding: 3px 2px;
+      border-radius: 6px;
+      font-size: 12px;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      min-height: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .day-header {
+      font-weight: 600;
+      color: #4A90E2;
+      background: rgba(74, 144, 226, 0.08);
+      padding: 6px 3px;
+      font-size: 11px;
+      min-height: 24px;
+    }
+
+    .weekend {
+      background: rgba(229, 62, 62, 0.05);
+      color: #E53E3E;
+    }
+
+    .weekend:hover {
+      background: #E53E3E;
+      color: white;
+      transform: scale(1.02);
+    }
+
+    .calendar-cell.weekend .date-display {
+      color: #E53E3E !important;
+    }
+
+    /* 添加节假日样式 */
+    .holiday {
+      background: rgba(229, 62, 62, 0.05);
+      color: #E53E3E;
+    }
+
+    .holiday:hover {
+      background: #E53E3E;
+      color: white;
+      transform: scale(1.02);
+    }
+
+    .calendar-cell.holiday .date-display {
+      color: #E53E3E !important;
+    }
+
+    .week-total {
+      font-weight: 700;
+      background: rgba(94, 96, 206, 0.1);
+      color: #5E60CE;
+      padding: 6px 3px;
+      font-size: 11px;
+    }
+
+    .cell-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      height: 100%;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .date-display {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 12px;
+      margin-bottom: 0;
+    }
+
+    .date-display.overtime-circle {
+      display: inline-flex;
+      width: 22px;
+      height: 22px;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #38A169;
+      border-radius: 50%;
+    }
+
+    .date-display.leave-circle {
+      display: inline-flex;
+      width: 22px;
+      height: 22px;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #E53E3E;
+      border-radius: 50%;
+    }
+
+    .date-display.today-circle {
+      display: inline-flex;
+      width: 22px;
+      height: 22px;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #4A90E2;
+      border-radius: 50%;
+    }
+
+    .calendar-legend {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 10px;
+      font-size: 11px;
+      color: #4A5568;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .legend-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .legend-green {
+      border: 2px solid #38A169;
+    }
+
+    .legend-red {
+      border: 2px solid #E53E3E;
+    }
+
+    .legend-blue {
+      border: 2px solid #4A90E2;
+    }
+
+    .hours-display {
+      color: #4A90E2;
+      font-weight: 500;
+      font-size: 11px;
+      background: rgba(74, 144, 226, 0.1);
+      padding: 2px 4px;
+      border-radius: 6px;
+      margin: 0 auto;
+      width: fit-content;
+      margin-top: 0;
+    }
+
+    .calendar-cell:not(.day-header):not(.week-total) {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .calendar-cell:not(.day-header):not(.week-total):hover {
+      background: #ebf8ff;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(74, 144, 226, 0.1);
+      border-color: #4A90E2;
+    }
+
+    .calendar-cell:not(.day-header):not(.week-total):active {
+      transform: translateY(0);
+      box-shadow: 0 1px 2px rgba(74, 144, 226, 0.2);
+    }
+
+    .edit-button {
+      margin-top: 2px;
+      font-size: 10px;
+      padding: 2px 4px;
+      cursor: pointer;
+      background: rgba(74, 144, 226, 0.1);
+      color: #4A90E2;
+      border: none;
+      border-radius: 2px;
+      transition: all 0.2s;
+      font-weight: 600;
+      min-width: 24px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .edit-button:hover {
+      background: #4A90E2;
+      color: white;
+    }
+
+    .today .date-display {
+      position: relative;
+      z-index: 2;
+    }
+
+    .today::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(74, 144, 226, 0.25), rgba(74, 144, 226, 0.10));
+      border: 2px solid #4A90E2;
+      border-radius: 4px;
+      z-index: 1;
+    }
+
+    .summary-info {
+      margin-top: 8px;
+      padding: 8px;
+      background: #f0f7ff;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .summary-item {
+      text-align: center;
+    }
+
+    .summary-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #4A90E2;
+    }
+
+    .summary-label {
+      font-size: 11px;
+      color: #666;
+    }
+
+    /* 响应式调整 */
+    @media (max-width: 850px) {
+      body {
+        width: 100%;
+        min-width: 700px;
+        padding: 10px;
+      }
+
+      .calendar-cell {
+        padding: 2px 1px;
+        font-size: 11px;
+      }
+    }
+
+    .footer {
+      display: flex;
+      justify-content: flex-start;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    #importButton, #exportButton, #settingsButton {
+      padding: 6px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+      border: 1px solid #e2e8f0;
+      background: white;
+      color: #4A90E2;
+    }
+
+    #importButton:hover, #exportButton:hover, #settingsButton:hover {
+      background: #f0f7ff;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(74, 144, 226, 0.15);
+    }
+
+    /* 确认弹窗（导出二次确认） */
+    .confirm-modal .modal-content {
+      width: 340px;
+      min-width: 300px;
+      max-width: 380px;
+    }
+
+    .confirm-body {
+      padding: 24px 24px 12px;
+      text-align: center;
+    }
+
+    .confirm-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+
+    .confirm-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .confirm-message {
+      font-size: 13px;
+      color: #718096;
+      line-height: 1.5;
+    }
+
+    .confirm-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 12px 24px 20px;
+    }
+
+    .confirm-button {
+      padding: 8px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s;
+    }
+
+    .confirm-button-cancel {
+      background: white;
+      color: #718096;
+    }
+
+    .confirm-button-cancel:hover {
+      background: #f7fafc;
+    }
+
+    .confirm-button-confirm {
+      background: #4A90E2;
+      color: white;
+      border-color: #4A90E2;
+    }
+
+    .confirm-button-confirm:hover {
+      background: #3a7bd5;
+    }
+
+    .small-text {
+      font-size: 10px;
+      color: #718096;
+      margin-top: 2px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+
+    /* 模态框样式 */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: white;
+      width: 50%;
+      max-width: 380px;
+      min-width: 280px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.2);
+      animation: modalAppear 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      max-height: 85vh;
+    }
+
+    /* 添加响应式支持 */
+    @media (max-width: 450px) {
+      
+      .modal-header {
+        padding: 12px; /* 减少内边距 */
+      }
+      
+      .modal-title {
+        font-size: 14px; /* 减小标题字体 */
+      }
+      
+      .modal-body {
+        padding: 15px; /* 减少内边距 */
+      }
+      
+      .form-group input {
+        padding: 8px 10px; /* 减少输入框内边距 */
+        font-size: 13px;
+      }
+      
+      .modal-footer {
+        padding: 10px 15px; /* 减少底部内边距 */
+      }
+      
+      .modal-button {
+        padding: 8px; /* 减少按钮内边距 */
+        font-size: 11px;
+      }
+    }
+
+    @media (max-width: 320px) {
+      .modal-content {
+        width: 95%; /* 在极小屏幕下进一步调整 */
+        max-width: 200px;
+        min-width: 160px;
+      }
+    }
+
+    .modal-header {
+      background: linear-gradient(90deg, #4A90E2, #5E60CE);
+      padding: 16px;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .close-button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .close-button:hover {
+      transform: rotate(90deg);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #4A5568;
+      font-size: 12px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: #4A90E2;
+      box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+      outline: none;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      padding: 12px 20px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .modal-button {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      font-size: 12px;
+    }
+
+    #saveTime {
+      background: linear-gradient(135deg, #4A90E2, #5E60CE);
+      color: white;
+    }
+
+    #saveTime:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(74, 144, 226, 0.3);
+    }
+
+    #cancelEdit {
+      background: #f0f4f8;
+      color: #4A5568;
+    }
+
+    #cancelEdit:hover {
+      background: #e2e8f0;
+    }
+
+    /* 动画效果 */
+    @keyframes modalAppear {
+      from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* 响应式调整 */
+    @media (max-width: 450px) {
+      .calendar-cell {
+        padding: 3px 1px;
+        font-size: 10px;
+        min-height: 28px;
+      }
+    }
+
+    /* 状态指示器 */
+    .status-indicator {
+      display: flex;
+      justify-content: center;
+      margin-top: 8px;
+      gap: 12px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+    }
+
+    .status-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .today-color {
+      background: rgba(74, 144, 226, 0.15);
+    }
+
+    .weekend-color {
+      color: #E53E3E;
+      background: rgba(229, 62, 62, 0.05);
+    }
+
+    .week-total-color {
+      background: rgba(94, 96, 206, 0.1);
+    }
+
+    /* 晚餐时间样式 */
+    .dinner-time {
+      background: rgba(251, 191, 36, 0.15) !important;
+      color: #d97706 !important;
+      font-size: 10px;
+      position: relative;
+    }
+
+    .dinner-time .hours-display::after {
+      content: " 🍱";
+      font-size: 8px;
+    }
+
+    .dinner-time:hover {
+      background: rgba(251, 191, 36, 0.3) !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(217, 119, 6, 0.2);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="app-title">WorkTime 打卡时间记录</div>
+  </div>
+
+  <div class="calendar-container">
+    <div class="calendar-header">
+      <div class="nav-buttons">
+        <button id="prevMonth" class="nav-button">◀</button>
+        <button id="nextMonth" class="nav-button">▶</button>
+      </div>
+
+      <div class="month-info">
+        <div id="monthYear">2025年7月</div>
+      </div>
+    </div>
+
+    <!-- 日历网格 -->
+    <div id="calendarGrid">
+      <!-- 星期标题 -->
+      <div class="calendar-cell day-header weekend">周日</div>
+      <div class="calendar-cell day-header">周一</div>
+      <div class="calendar-cell day-header">周二</div>
+      <div class="calendar-cell day-header">周三</div>
+      <div class="calendar-cell day-header">周四</div>
+      <div class="calendar-cell day-header">周五</div>
+      <div class="calendar-cell day-header weekend">周六</div>
+      <div class="calendar-cell day-header">周汇总</div>
+      
+      <!-- 日历内容将通过JavaScript动态生成 -->
+    </div>
+
+    <!-- 汇总信息 -->
+    <div class="summary-info">
+      <div class="summary-item">
+        <div class="summary-value" id="monthlyTotalHours">0</div>
+        <div class="summary-label">工作日月总工时</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value" id="avgHours">0</div>
+        <div class="summary-label">日均工时</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value" id="totalLeaveHours">0</div>
+        <div class="summary-label">请假总工时</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value" id="workDays">0</div>
+        <div class="summary-label">工作日天数</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value" id="overtimeHours">0</div>
+        <div class="summary-label">工作日加班工时</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value" id="weekendOvertimeHours">0</div>
+        <div class="summary-label">假日加班工时</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value" id="overtimeRatio" style="font-weight:bold">NA</div>
+        <div class="summary-label">加班等效比</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button id="importButton">
+      <span>📥</span> 导入数据
+    </button>
+    <button id="exportButton">
+      <span>📤</span> 导出数据
+    </button>
+    <button id="settingsButton">
+      <span>⚙️</span> 班次设置
+    </button>
+    <!-- 图例说明 -->
+    <div class="calendar-legend" style="margin-left: auto;">
+      <span class="legend-item">
+        <span class="legend-dot legend-green"></span> 加班
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot legend-red"></span> 请假
+      </span>
+      <span class="legend-item">
+        <span class="legend-dot legend-blue"></span> 当天
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑模态框 -->
+<div id="editModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">编辑工作时间</div>
+      <button class="close-button">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="modalDate">日期</label>
+        <input type="text" id="modalDate" value="" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="startTime">开始时间 (HH:mm)</label>
+        <input type="time" id="startTime" name="startTime">
+      </div>
+
+      <div class="form-group">
+        <label for="endTime">结束时间 (HH:mm)</label>
+        <input type="time" id="endTime" name="endTime">
+      </div>
+
+      <div class="form-group">
+        <label for="editOvertimeHours">加班小时数</label>
+        <input type="number" id="editOvertimeHours" name="editOvertimeHours" min="0" step="0.5" value="0">
+      </div>
+
+      <div class="form-group">
+        <label for="leaveHours">请假小时数</label>
+        <input type="number" id="leaveHours" name="leaveHours" min="0" step="0.5" value="0">
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="cancelEdit" class="modal-button">取消</button>
+      <button id="saveTime" class="modal-button">保存更改</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置模态框 -->
+<div id="settingsModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">工作班次设置</div>
+      <button class="close-button">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="shiftModeSelect">班次选择</label>
+        <select id="shiftModeSelect" name="shiftModeSelect" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:14px;">
+          <option value="flexibleF">弹性F班</option>
+          <option value="standard">标准班</option>
+        </select>
+      </div>
+
+      <div style="font-size:14px; font-weight:600; color:#4a5568; margin:16px 0 8px; padding:8px 0; border-bottom:2px solid #e2e8f0;">弹性F班</div>
+
+      <div class="form-group">
+        <label for="coreStartTime">核心工作时间开始</label>
+        <input type="time" id="coreStartTime" name="coreStartTime" value="09:00">
+      </div>
+
+      <div class="form-group">
+        <label for="coreEndTime">核心工作时间结束</label>
+        <input type="time" id="coreEndTime" name="coreEndTime" value="17:30">
+      </div>
+
+      <div class="form-group">
+        <label for="lunchBreakStart">午休开始时间</label>
+        <input type="time" id="lunchBreakStart" name="lunchBreakStart" value="12:00">
+      </div>
+
+      <div class="form-group">
+        <label for="lunchBreakEnd">午休结束时间</label>
+        <input type="time" id="lunchBreakEnd" name="lunchBreakEnd" value="13:30">
+      </div>
+
+      <div class="form-group">
+        <label for="dinnerBreakStart">晚餐开始时间</label>
+        <input type="time" id="dinnerBreakStart" name="dinnerBreakStart" value="17:30">
+      </div>
+
+      <div class="form-group">
+        <label for="dinnerBreakEnd">晚餐结束时间</label>
+        <input type="time" id="dinnerBreakEnd" name="dinnerBreakEnd" value="18:00">
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="cancelSettings" class="modal-button">取消</button>
+      <button id="saveSettings" class="modal-button">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导出确认弹窗 -->
+<div id="exportConfirmModal" class="modal confirm-modal">
+  <div class="modal-content">
+    <div class="confirm-body">
+      <div class="confirm-icon">📤</div>
+      <div class="confirm-title">确认导出数据</div>
+      <div class="confirm-message">
+        将导出所有工时记录为 CSV 文件，<br>是否继续？
+      </div>
+    </div>
+    <div class="confirm-footer">
+      <button id="exportConfirmCancel" class="confirm-button confirm-button-cancel">取消</button>
+      <button id="exportConfirmOk" class="confirm-button confirm-button-confirm">确认导出</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入进度遮罩 -->
+<div id="importProgressOverlay" class="modal" style="display:none; background: rgba(0,0,0,0.5);">
+  <div class="modal-content" style="width:300px; text-align:center; padding:30px;">
+    <div style="font-size:40px; margin-bottom:15px;">⏳</div>
+    <div style="font-size:16px; font-weight:600; color:#2d3748; margin-bottom:10px;">正在导入数据...</div>
+    <div id="importProgressText" style="font-size:13px; color:#718096; margin-bottom:15px;">正在处理第 0 行...</div>
+    <div style="width:100%; height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden;">
+      <div id="importProgressBar" style="width:0%; height:100%; background:#4A90E2; border-radius:3px; transition: width 0.3s;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 导入结果弹窗 -->
+<div id="importResultModal" class="modal confirm-modal" style="display:none;">
+  <div class="modal-content">
+    <div class="confirm-body">
+      <div class="confirm-icon" id="importResultIcon">✅</div>
+      <div class="confirm-title" id="importResultTitle">导入完成</div>
+      <div class="confirm-message" id="importResultMessage" style="text-align:left; line-height:1.8; font-size:13px;"></div>
+    </div>
+    <div class="confirm-footer">
+      <button id="importResultOk" class="confirm-button confirm-button-confirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<script src="work-time-record.js"></script>
+</body>
+</html>

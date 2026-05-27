@@ -123,7 +123,11 @@ function minutesToTime(minutes) {
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
-// 计算核心工时（含午餐/晚餐扣除）
+// 计算核心工时（弹性F班规则）
+// 规则：
+//   1. 开始打卡时间早于08:00 → 从08:00开始计算，晚于08:00 → 按实际打卡时间
+//   2. 结束打卡时间 > 13:30 → 日总打卡时长减去1.5小时（午休）
+//   3. 结束打卡时间 > 18:00 → 日总打卡时长减去2小时（午休+晚餐）
 function calculateFlexibleWorkHours(firstClick, lastClick) {
   if (!firstClick || !lastClick) return 0;
 
@@ -131,69 +135,35 @@ function calculateFlexibleWorkHours(firstClick, lastClick) {
   const firstDate = new Date(firstClick);
   const lastDate = new Date(lastClick);
 
-  // 提取时间部分
-  const firstTimeStr = `${String(firstDate.getHours()).padStart(2, '0')}:${String(firstDate.getMinutes()).padStart(2, '0')}`;
-  const lastTimeStr = `${String(lastDate.getHours()).padStart(2, '0')}:${String(lastDate.getMinutes()).padStart(2, '0')}`;
+  // 提取时间部分（分钟数）
+  const firstMinutes = firstDate.getHours() * 60 + firstDate.getMinutes();
+  const lastMinutes = lastDate.getHours() * 60 + lastDate.getMinutes();
 
-  // 转换为分钟数
-  const firstTimeMinutes = timeToMinutes(firstTimeStr);
-  const lastTimeMinutes = timeToMinutes(lastTimeStr);
+  // 规则1：开始时间早于08:00则从08:00开始计算
+  const coreStartMinutes = timeToMinutes(workSettings.coreStartTime); // 默认 08:00
+  const effectiveStart = Math.max(firstMinutes, coreStartMinutes);
 
-  // 核心工作时间（分钟）
-  const coreStartMinutes = timeToMinutes(workSettings.coreStartTime);
-  const coreEndMinutes = timeToMinutes(workSettings.coreEndTime);
+  // 开始时间不能晚于结束时间
+  if (effectiveStart >= lastMinutes) return 0;
 
-  // 午休时间
-  const lunchStartMinutes = timeToMinutes(workSettings.lunchBreakStart);
-  const lunchEndMinutes = timeToMinutes(workSettings.lunchBreakEnd);
+  // 日总打卡时长（分钟）
+  let totalMinutes = lastMinutes - effectiveStart;
 
-  // 晚餐时间
-  const dinnerStartMinutes = timeToMinutes(workSettings.dinnerBreakStart);
-  const dinnerEndMinutes = timeToMinutes(workSettings.dinnerBreakEnd);
+  // 规则2&3：根据结束打卡时间扣除午餐/晚餐
+  const lunchEndMinutes = timeToMinutes(workSettings.lunchBreakEnd);   // 默认 13:30
+  const dinnerEndMinutes = timeToMinutes(workSettings.dinnerBreakEnd); // 默认 18:00
 
-  // 计算有效工作时间
-  // 最早从核心上班时间开始（打卡早于08:00 → 从08:00算起）
-  let effectiveStartTime = Math.max(firstTimeMinutes, coreStartMinutes);
-  // 最晚到核心下班时间（不可早于17:30下班）
-  let effectiveEndTime = Math.max(lastTimeMinutes, coreEndMinutes);
-
-  // 处理晚餐时间（如果开始时间落在晚餐时段内，调整到晚餐结束）
-  if (effectiveStartTime >= dinnerStartMinutes && effectiveStartTime < dinnerEndMinutes) {
-    effectiveStartTime = dinnerEndMinutes;
+  if (lastMinutes > dinnerEndMinutes) {
+    // 超过18:00 → 扣2小时（午休1.5h + 晚餐0.5h）
+    totalMinutes -= 120;
+  } else if (lastMinutes > lunchEndMinutes) {
+    // 超过13:30但不超过18:00 → 扣1.5小时（仅午休）
+    totalMinutes -= 90;
   }
+  // 不超过13:30 → 不扣除
 
-  // 确保开始时间不晚于结束时间
-  if (effectiveStartTime >= effectiveEndTime) {
-    return 0;
-  }
-
-  // 计算总工作时间（分钟）
-  let totalMinutes = effectiveEndTime - effectiveStartTime;
-
-  // 扣除午休时间（如果午休在工作时间内）
-  if (effectiveStartTime <= lunchStartMinutes && effectiveEndTime >= lunchEndMinutes) {
-    totalMinutes -= (lunchEndMinutes - lunchStartMinutes);
-  } else if (effectiveStartTime < lunchEndMinutes && effectiveEndTime > lunchStartMinutes) {
-    // 部分覆盖午休时间
-    const overlapStart = Math.max(effectiveStartTime, lunchStartMinutes);
-    const overlapEnd = Math.min(effectiveEndTime, lunchEndMinutes);
-    totalMinutes -= (overlapEnd - overlapStart);
-  }
-
-  // 扣除晚餐时间（如果晚餐在工作时间内）
-  if (effectiveStartTime <= dinnerStartMinutes && effectiveEndTime >= dinnerEndMinutes) {
-    totalMinutes -= (dinnerEndMinutes - dinnerStartMinutes);
-  } else if (effectiveStartTime < dinnerEndMinutes && effectiveEndTime > dinnerStartMinutes) {
-    // 部分覆盖晚餐时间
-    const overlapStart = Math.max(effectiveStartTime, dinnerStartMinutes);
-    const overlapEnd = Math.min(effectiveEndTime, dinnerEndMinutes);
-    totalMinutes -= (overlapEnd - overlapStart);
-  }
-
-  // 如果扣除午休和晚餐后时间为负，返回0
-  if (totalMinutes <= 0) {
-    return 0;
-  }
+  // 时间为负则返回0
+  if (totalMinutes <= 0) return 0;
 
   // 转换为小时并保留两位小数
   const hours = totalMinutes / 60;
@@ -215,6 +185,11 @@ function applyShiftPreset(mode) {
   if (sectionTitle) {
     sectionTitle.textContent = mode === 'flexibleF' ? '弹性F班' : '标准班';
   }
+
+  // 更新 tooltip 提示
+  const shiftSelect = document.getElementById('shiftModeSelect');
+  const optionText = shiftSelect.options[shiftSelect.selectedIndex]?.text || '弹性F班';
+  shiftSelect.title = `当前班次：${optionText}`;
 }
 
 // 计算工作时间（小时）
@@ -293,7 +268,7 @@ async function renderCalendar(date) {
         const hasAttendance = hours > 0 || (dayData && dayData.leaveHours > 0);
         if (isStatutoryWorkday && hasAttendance) {
           statutoryWorkDays++;
-          // 累计法定工作日工时（有请假时 calculateFlexibleWorkHours 已自动取8:00-17:30与打卡时间的交集）
+          // 累计法定工作日工时（有请假时记录留空，工时计为0）
           if (hours > 0) {
             workdayWorkHours += hours;
           }

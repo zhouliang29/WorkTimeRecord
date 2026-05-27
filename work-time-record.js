@@ -190,6 +190,12 @@ function applyShiftPreset(mode) {
   const shiftSelect = document.getElementById('shiftModeSelect');
   const optionText = shiftSelect.options[shiftSelect.selectedIndex]?.text || '弹性F班';
   shiftSelect.title = `当前班次：${optionText}`;
+
+  // 更新首页班次设置按钮的 tooltip
+  const settingsBtn = document.getElementById('settingsButton');
+  if (settingsBtn) {
+    settingsBtn.title = `当前班次：${optionText}`;
+  }
 }
 
 // 计算工作时间（小时）
